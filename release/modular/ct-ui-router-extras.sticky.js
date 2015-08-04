@@ -73,6 +73,20 @@ function $StickyStateProvider($stateProvider, uirextras_coreProvider) {
         return inactivesByAllParents;
       }
 
+      function mapImmediateInactiveChildren() {
+        var inactiveChildren ={};
+        forEach(inactiveStates, function(state) {
+          forEach(state.path, function(ancestor) {
+            if (ancestor === state) return;
+            if( ancestor.path.length != state.path.length - 1 ) return;
+
+            inactiveChildren[ancestor.name] = inactiveChildren[ancestor.name] || [];
+            inactiveChildren[ancestor.name].push(state);
+          });
+        });
+        return inactiveChildren;
+      }
+
       // Given a state, returns all ancestor states which are sticky.
       // Walks up the view's state's ancestry tree and locates each ancestor state which is marked as sticky.
       // Returns an array populated with only those ancestor sticky states.
@@ -140,6 +154,19 @@ function $StickyStateProvider($stateProvider, uirextras_coreProvider) {
         return true;
       }
 
+      function isStateInPath( state, path ) {
+          var found = false;
+
+          for( var i = 0; i < path.length; i++ ) {
+            if( state.name === path[i].name ) {
+              found = true;
+              break;
+            }
+          }
+
+          return found;
+      }
+
       var stickySupport = {
         getInactiveStates: function () {
           var states = [];
@@ -159,6 +186,8 @@ function $StickyStateProvider($stateProvider, uirextras_coreProvider) {
         //    reactivatingStates: Array of all states which will be reactivated if the transition is completed.
         //    deepestReactivateChildren: Array of inactive children states of the toState, if the toState is being reactivated.
         //        Note: Transitioning directly to an inactive state with inactive children will reactivate the state, but exit all the inactive children.
+        //    inactiveOrphans: Array of all inactive orphan states scheduled for exiting. Inactive orphans are states "outside" of the path from the sticky state
+        //        being transitioned into, including all inactive children of the final state
         //    enter: Enter transition type for all added states.  This is a sticky array to "toStates" array in $state.transitionTo.
         //    exit: Exit transition type for all removed states.  This is a sticky array to "fromStates" array in $state.transitionTo.
         // }
@@ -226,7 +255,53 @@ function $StickyStateProvider($stateProvider, uirextras_coreProvider) {
 
           // Get the currently inactive states (before the transition is processed), mapped by parent state
           var inactivesByAllParents = mapInactivesByImmediateParent();
-          
+          var immediateInactiveChildren = mapImmediateInactiveChildren();
+
+          // Gather all inactive orphan states outside of the path being transitioned into
+          var inactiveOrphans = [];
+          toPath.forEach( function( pathState ) {
+              var toExit = [];
+              if( pathState === transition.toState &&
+                  deepestReactivate === transition.toState ) {
+                  toExit = inactivesByAllParents[ pathState.name ] || [];
+              }
+              else {
+                  var children = immediateInactiveChildren[ pathState.name ] || [];
+                  children.forEach( function( child ) {
+                      if( child.sticky ) return;
+                      if( isStateInPath( child, toPath ) ) return;
+
+                      toExit.push( child );
+                      var childInactiveTree = inactivesByAllParents[ child.name ] || [];
+                      toExit = toExit.concat( childInactiveTree );
+                  });
+              }
+
+              inactiveOrphans = inactiveOrphans.concat( toExit );
+          });
+          /*if( deepestReactivate ) {
+
+
+            var toCheck = inactivesByAllParents[ deepestReactivate.name] || []
+            toCheck.forEach( function( inactiveOrphan ) {
+              if( inactiveOrphan.sticky ) {
+                  return;
+              }
+
+              var found = false;
+              for( var i = 0; i < toPath.length; i++ ) {
+                if( inactiveOrphan.name === toPath[i].name ) {
+                  found = true;
+                  break;
+                }
+              }
+              if( !found ) {
+                inactiveOrphans.push( inactiveOrphan );
+              }
+            });
+          }*/
+          exitingStates = exitingStates.concat(inactiveOrphans);
+
           // If we are transitioning directly to an inactive state, and that state also has inactive children,
           // then find those children so that they can be exited.
           var deepestReactivateChildren = [];
@@ -234,7 +309,7 @@ function $StickyStateProvider($stateProvider, uirextras_coreProvider) {
             deepestReactivateChildren = inactivesByAllParents[deepestReactivate.name] || [];
           }
           // Add them to the list of states being exited.
-          exitingStates = exitingStates.concat(deepestReactivateChildren);
+          //exitingStates = exitingStates.concat(deepestReactivateChildren);
 
           // Find any other inactive children of any of the states being "exited"
           var exitingChildren = map(exitingStates, function (state) {
@@ -258,6 +333,7 @@ function $StickyStateProvider($stateProvider, uirextras_coreProvider) {
           result.inactives = inactives;
           result.reactivatingStates = reactivatingStates;
           result.deepestReactivateChildren = deepestReactivateChildren;
+          result.inactiveOrphans = inactiveOrphans
 
           return result;
         },
@@ -786,9 +862,9 @@ angular.module("ct.ui.router.extras.sticky").config(
 
               // We may transition directly to an inactivated state, reactivating it.  In this case, we should
               // exit all of that state's inactivated children.
-              var inactiveOrphans = stickyTransitions.deepestReactivateChildren;
+              var inactiveOrphans = stickyTransitions.inactiveOrphans;
               // Add surrogate exited states for all orphaned descendants of the Deepest Reactivated State
-              surrogateFromPath = surrogateFromPath.concat(map(stickyTransitions.deepestReactivateChildren, function (exiting) {
+              surrogateFromPath = surrogateFromPath.concat(map(inactiveOrphans, function (exiting) {
                 return stateExitedSurrogate(exiting);
               }));
               exited = exited.concat(inactiveOrphans);
