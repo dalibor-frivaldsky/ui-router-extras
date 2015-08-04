@@ -175,8 +175,6 @@ function $StickyStateProvider($stateProvider, uirextras_coreProvider) {
         //    keep: The number of states being "kept"
         //    inactives: Array of all states which will be inactive if the transition is completed.
         //    reactivatingStates: Array of all states which will be reactivated if the transition is completed.
-        //    deepestReactivateChildren: Array of inactive children states of the toState, if the toState is being reactivated.
-        //        Note: Transitioning directly to an inactive state with inactive children will reactivate the state, but exit all the inactive children.
         //    inactiveOrphans: Array of all inactive orphan states scheduled for exiting. Inactive orphans are states "outside" of the path from the sticky state
         //        being transitioned into, including all inactive children of the final state
         //    enter: Enter transition type for all added states.  This is a sticky array to "toStates" array in $state.transitionTo.
@@ -270,37 +268,8 @@ function $StickyStateProvider($stateProvider, uirextras_coreProvider) {
 
               inactiveOrphans = inactiveOrphans.concat( toExit );
           });
-          /*if( deepestReactivate ) {
-
-
-            var toCheck = inactivesByAllParents[ deepestReactivate.name] || []
-            toCheck.forEach( function( inactiveOrphan ) {
-              if( inactiveOrphan.sticky ) {
-                  return;
-              }
-
-              var found = false;
-              for( var i = 0; i < toPath.length; i++ ) {
-                if( inactiveOrphan.name === toPath[i].name ) {
-                  found = true;
-                  break;
-                }
-              }
-              if( !found ) {
-                inactiveOrphans.push( inactiveOrphan );
-              }
-            });
-          }*/
-          exitingStates = exitingStates.concat(inactiveOrphans);
-
-          // If we are transitioning directly to an inactive state, and that state also has inactive children,
-          // then find those children so that they can be exited.
-          var deepestReactivateChildren = [];
-          if (deepestReactivate === transition.toState) {
-            deepestReactivateChildren = inactivesByAllParents[deepestReactivate.name] || [];
-          }
           // Add them to the list of states being exited.
-          //exitingStates = exitingStates.concat(deepestReactivateChildren);
+          exitingStates = exitingStates.concat(inactiveOrphans);
 
           // Find any other inactive children of any of the states being "exited"
           var exitingChildren = map(exitingStates, function (state) {
@@ -323,7 +292,6 @@ function $StickyStateProvider($stateProvider, uirextras_coreProvider) {
 
           result.inactives = inactives;
           result.reactivatingStates = reactivatingStates;
-          result.deepestReactivateChildren = deepestReactivateChildren;
           result.inactiveOrphans = inactiveOrphans
 
           return result;

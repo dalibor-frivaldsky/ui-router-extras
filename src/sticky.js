@@ -431,10 +431,9 @@ angular.module("ct.ui.router.extras.sticky").config(
                 });
               }
 
-              // We may transition directly to an inactivated state, reactivating it.  In this case, we should
-              // exit all of that state's inactivated children.
+              // We need to exit all inactive orphaned states
               var inactiveOrphans = stickyTransitions.inactiveOrphans;
-              // Add surrogate exited states for all orphaned descendants of the Deepest Reactivated State
+              // Add surrogate exited states for all orphaned states
               surrogateFromPath = surrogateFromPath.concat(map(inactiveOrphans, function (exiting) {
                 return stateExitedSurrogate(exiting);
               }));
