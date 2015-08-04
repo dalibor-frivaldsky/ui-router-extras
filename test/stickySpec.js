@@ -284,7 +284,7 @@ describe('stickyState', function () {
 
       newStates['A._1.__1'] = {};
       newStates['A._2.__2'] = {};
-      newStates['A._3.__1'] = { views: { '__1@A._3': {} } };
+      newStates['A._3.__1'] = { sticky: true, views: { '__1@A._3': {} } };
       newStates['A._3.__2'] = { views: { '__2@A._3': {} } };
 
       newStates['A._1.__1.B'] = {};
